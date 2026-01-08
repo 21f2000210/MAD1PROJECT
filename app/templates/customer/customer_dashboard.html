@@ -4,46 +4,58 @@
 {% block content %}
 <div class="container">
     <!-- Welcome Header -->
-    
-           <div class="page-header">
+    <div class="page-header">
         <div class="d-flex justify-content-between align-items-center">
             <h2>{{ current_user.username}} Dashboard</h2>
         </div>
-           </div>
-
-    
+    </div>
 
     <!-- Search for Professionals -->
-<div class="card mb-4">
-    <div class="card-header"><h4 class="mb-0">Find a Service Professional</h4></div>
-    <div class="card-body">
-        <form method="GET" action="{{ url_for('customer.customer_dashboard') }}">
-            <div class="row g-2">
-                <div class="col-md-5">
-                    <select class="form-select" name="service_id" id="service_id">
-                        <option value="">-- All Service Types --</option>
-                        {% for service in all_services %}
-                        <option value="{{ service.id }}" {% if service.id == search_params.service_id %}selected{% endif %}>
-                            {{ service.service_type }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-5">
-                    <input type="text" class="form-control" name="q" placeholder="Search by name, location, PIN..." value="{{ search_params.q or '' }}">
-                </div>
-                <div class="col-md-2">
-                    <button class="btn btn-primary w-100" type="submit">Search</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
+    <div class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Find a Service Professional</h4></div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('customer.customer_dashboard') }}">
+                <div class="row g-2">
+                    <!-- Service Dropdown -->
+                    <div class="col-md-4">
+                        <select class="form-select" name="service_id" id="service_id">
+                            <option value="">-- All Service Types --</option>
+                            {% for service in all_services %}
+                            <option value="{{ service.id }}" {% if service.id == search_params.service_id %}selected{% endif %}>
+                                {{ service.service_type }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-<!-- Professionals Listing -->
-    {% if professionals is not none %}
+                    <!-- Text Search -->
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" name="q" placeholder="Search Name, Service (e.g. Plumber), or Location..." value="{{ search_params.q or '' }}">
+                    </div>
+
+                    <!-- Sort Dropdown -->
+                    <div class="col-md-2">
+                        <select class="form-select" name="sort_by">
+                            <option value="rating" {% if search_params.sort_by == 'rating' %}selected{% endif %}>Highest Rated</option>
+                            <option value="price_low" {% if search_params.sort_by == 'price_low' %}selected{% endif %}>Price: Low to High</option>
+                            <option value="price_high" {% if search_params.sort_by == 'price_high' %}selected{% endif %}>Price: High to Low</option>
+                            <option value="experience" {% if search_params.sort_by == 'experience' %}selected{% endif %}>Most Experienced</option>
+                        </select>
+                    </div>
+
+                    <!-- Search Button -->
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100" type="submit">Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Professionals Listing -->
+    {% if results is not none %}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="mb-0">
                 {% if selected_service_name %}
                     Available Professionals for '{{ selected_service_name }}'
@@ -51,57 +63,87 @@
                     Search Results
                 {% endif %}
             </h4>
+            <span class="badge bg-secondary">{{ results|length }} found</span>
         </div>
         <div class="card-body">
-            {% if professionals %}
+            {% if results %}
             <div class="list-group">
-                <!-- LOOP 1: Build the visible list of professionals with buttons -->
-                {% for prof in professionals %}
+                <!-- LOOP 1: Build the visible list -->
+                {% for item in results %}
                 <div class="list-group-item list-group-item-action">
                     <div class="d-flex w-100 justify-content-between">
                         <h5 class="mb-1">
-                            <a href="{{ url_for('shared.professional_profile', professional_id=prof.id) }}" class="text-decoration-none">
-                               {{ prof.user.username }}</a>
+                            <a href="{{ url_for('shared.professional_profile', professional_id=item.prof.id) }}" class="text-decoration-none">
+                               {{ item.user.username }}
+                            </a>
                         </h5>
-                        <small class="text-muted">Avg. Rating: {{ avg_ratings.get(prof.id, 'N/A') }} ★</small>
+                        <div class="text-end">
+                            <span class="text-warning fw-bold">{{ item.rating }} ★</span>
+                            <br>
+                            <small class="text-muted">{{ item.jobs_count }} Jobs Done</small>
+                        </div>
                     </div>
-                    <p class="mb-1">{{ prof.description or 'No description available.' }}</p>
-                    <small>Experience: {{ prof.experience or 'N/A' }} years</small>
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#bookServiceModal{{ prof.id }}">
-                            Book Service
-                        </button>
+                    
+                    <div class="mb-1">
+                        <span class="badge bg-info text-dark">{{ item.service.service_type }}</span>
+                        <span class="text-muted ms-2">{{ item.prof.description or 'No description available.' }}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small><strong>Experience:</strong> {{ item.prof.experience or '0' }} years | <strong>Loc:</strong> {{ item.user.address }} ({{ item.user.pin }})</small>
+                        
+                        <div>
+                            <span class="me-3 fw-bold text-success">Base: ${{ "%.2f"|format(item.service.base_price) }}</span>
+                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#bookServiceModal{{ item.prof.id }}">
+                                Book Service
+                            </button>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
-                <p class="text-center text-muted">No professionals found matching your search criteria.</p>
+                <p class="text-center text-muted p-3">No professionals found matching your search criteria.</p>
             {% endif %}
         </div>
     </div>
 
     <!-- LOOP 2: Define all the booking modals OUTSIDE the list group -->
-    {% for prof in professionals %}
-    <div class="modal fade" id="bookServiceModal{{ prof.id }}" tabindex="-1" aria-hidden="true">
+    {% for item in results %}
+    <div class="modal fade" id="bookServiceModal{{ item.prof.id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-<form method="POST" action="{{ url_for('customer.book_service', professional_id=prof.id) }}">
-    {{ form.hidden_tag() }} <!-- Add CSRF token -->
-    <div class="modal-body">
-        <p>You are booking <strong>{{ prof.service.service_type }}</strong> service.</p>
-        <div class="mb-3">
-            {{ form.proposed_price.label(class="form-label") }}
-            {{ form.proposed_price(class="form-control", value=prof.service.base_price) }}
-        </div>
-        <!-- The form object handles the service_id field now -->
-        {{ form.service_id(value=prof.service_id, type="hidden") }}
-    </div>
-    <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        {{ form.submit(class="btn btn-primary") }}
-    </div>
-</form>
+                <form method="POST" action="{{ url_for('customer.book_service', professional_id=item.prof.id) }}">
+                    <!-- Manual CSRF Token since we are in a loop -->
+                    <input type="hidden" name="csrf_token" value="{{ form.csrf_token.current_token }}"> 
+                    
+                    <div class="modal-header">
+                        <h5 class="modal-title">Book {{ item.user.username }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>You are booking <strong>{{ item.service.service_type }}</strong> service.</p>
+                        
+                        <div class="mb-3">
+                            {{ form.proposed_price.label(class="form-label") }}
+                            <!-- Use the base price from the item object -->
+                            {{ form.proposed_price(class="form-control", value=item.service.base_price) }}
+                        </div>
+                        
+                        <!-- Manual Service ID Hidden Input -->
+                        <input type="hidden" name="service_id" value="{{ item.prof.service_id }}">
+                        
+                        <!-- FIXED: Use standard HTML input for date instead of form.date_of_request -->
+                        <div class="mb-3">
+                            <label class="form-label">Date of Service</label>
+                            <input type="date" name="date_of_request" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

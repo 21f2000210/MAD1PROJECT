@@ -1,8 +1,8 @@
-"""Initial database migration.
+"""Initial schema creation
 
-Revision ID: 6984a26a1e00
+Revision ID: d70b981fa9c5
 Revises: 
-Create Date: 2025-09-18 14:00:46.288266
+Create Date: 2025-10-17 07:36:02.202596
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '6984a26a1e00'
+revision = 'd70b981fa9c5'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -40,12 +40,14 @@ def upgrade():
     sa.Column('address', sa.String(length=200), nullable=True),
     sa.Column('pin', sa.String(length=20), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('api_key', sa.String(length=32), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_users_address'), ['address'], unique=False)
+        batch_op.create_index(batch_op.f('ix_users_api_key'), ['api_key'], unique=True)
         batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
         batch_op.create_index(batch_op.f('ix_users_pin'), ['pin'], unique=False)
         batch_op.create_index(batch_op.f('ix_users_role'), ['role'], unique=False)
@@ -86,7 +88,7 @@ def upgrade():
     sa.Column('proposed_price', sa.Float(), nullable=True),
     sa.Column('date_of_request', sa.DateTime(), nullable=False),
     sa.Column('date_of_completion', sa.DateTime(), nullable=True),
-    sa.Column('service_status', sa.Enum('REQUESTED', 'ACCEPTED', 'REJECTED', 'CLOSED', name='servicestatus'), nullable=False),
+    sa.Column('service_status', sa.Enum('REQUESTED', 'ACCEPTED', 'REJECTED', 'CLOSED', 'PAID', name='servicestatus'), nullable=False),
     sa.Column('remarks', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
@@ -148,6 +150,7 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_users_role'))
         batch_op.drop_index(batch_op.f('ix_users_pin'))
         batch_op.drop_index(batch_op.f('ix_users_email'))
+        batch_op.drop_index(batch_op.f('ix_users_api_key'))
         batch_op.drop_index(batch_op.f('ix_users_address'))
 
     op.drop_table('users')

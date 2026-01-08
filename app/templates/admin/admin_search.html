@@ -1,24 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Admin Search{% endblock %}
+{% block title %}Search Users{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="page-header">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Search Users</h2>
+<div class="container-fluid">
+    <div class="page-header mb-4">
+        <h2><i class="fas fa-search me-2"></i>Search Users</h2>
     </div>
 
-    <!-- Search Form -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" action="{{ url_for('admin.admin_search') }}">
-                <div class="input-group">
-                    <select name="category" class="form-select" style="max-width: 200px;">
+    <!-- Search Toolbar -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body bg-light">
+            <form method="GET" action="{{ url_for('admin.admin_search') }}" class="row g-2 align-items-center">
+                <div class="col-md-2">
+                    <select name="category" class="form-select">
                         <option value="professional" {% if search_params.category == 'professional' %}selected{% endif %}>Professional</option>
                         <option value="customer" {% if search_params.category == 'customer' %}selected{% endif %}>Customer</option>
                     </select>
-                    <input type="text" name="q" class="form-control" placeholder="Search by name, email, address, or PIN..." value="{{ search_params.q or '' }}" required>
-                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" name="q" class="form-control" 
+                               placeholder="Search by Name, Email, Address, PIN, or Service Type..." 
+                               value="{{ search_params.q }}" required>
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-100">Search</button>
+                    {% if search_params.q %}
+                        <a href="{{ url_for('admin.admin_search') }}" class="btn btn-outline-secondary" title="Clear Search"><i class="fas fa-times"></i></a>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -26,54 +37,102 @@
 
     <!-- Search Results -->
     {% if results is not none %}
-    <div class="card">
-        <div class="card-header">
-            <h4 class="mb-0">Search Results ({{ results|length }} found)</h4>
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-primary">Results</h5>
+            <span class="badge bg-secondary">{{ results|length }} found</span>
         </div>
-        <div class="card-body">
+        <div class="card-body p-0">
             {% if results %}
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover table-striped mb-0 align-middle">
                     <thead class="table-dark">
                         <tr>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Role</th>
+                            <th>User Details</th>
+                            {% if search_params.category == 'professional' %}
+                                <th>Service Profile</th>
+                            {% endif %}
+                            <th>Location (Address & PIN)</th>
                             <th>Status</th>
-                            <th>Actions</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in results %}
                         <tr>
-                            {% if item.user.role == 'professional' %}
+                            <!-- 1. User Details Column -->
                             <td>
-                            <a href="{{ url_for('shared.professional_profile', professional_id=item.id) }}" class="text-decoration-none">
-                               {{ item.user.username }}</a>
-                            </td>                          
-                            {% else %}
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-circle me-3 bg-secondary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 40px; height: 40px;">
+                                        {{ item.user.username[0]|upper }}
+                                    </div>
+                                    <div>
+                                        {% if item.user.role == 'professional' %}
+                                            <a href="{{ url_for('shared.professional_profile', professional_id=item.id) }}" class="fw-bold text-decoration-none">
+                                                {{ item.user.username }}
+                                            </a>
+                                            <div class="small text-muted"><i class="fas fa-envelope me-1"></i>{{ item.user.email }}</div>
+                                            <span class="badge bg-info text-dark mt-1">Professional</span>
+                                        {% else %}
+                                            <a href="{{ url_for('customer.customer_profile', customer_id=item.id) }}" class="fw-bold text-decoration-none">
+                                                {{ item.user.username }}
+                                            </a>
+                                            <div class="small text-muted"><i class="fas fa-envelope me-1"></i>{{ item.user.email }}</div>
+                                            <span class="badge bg-warning text-dark mt-1">Customer</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 2. Service Profile (Professionals Only) -->
+                            {% if search_params.category == 'professional' %}
                             <td>
-                                <a href="{{ url_for('customer.customer_profile', customer_id=item.id) }}" class="text-decoration-none">
-                                    {{ item.user.username }}
-                                </a>
-                            </td>                            {% endif %}
-                            <td>{{ item.user.email }}</td>
-                            <td>{{ item.user.role.title() }}</td>
+                                <strong>{{ item.service.service_type }}</strong>
+                                <div class="small text-muted">{{ item.experience }} years exp.</div>
+                                <div class="small text-success fw-bold">${{ item.service.base_price }} base</div>
+                            </td>
+                            {% endif %}
+
+                            <!-- 3. Location Column -->
+                            <td>
+                                <div>{{ item.user.address }}</div>
+                                <div class="small text-muted"><strong>PIN:</strong> {{ item.user.pin }}</div>
+                            </td>
+
+                            <!-- 4. Status Column -->
                             <td>
                                 {% if item.admin_blocked %}
-                                    <span class="badge bg-danger">Blocked</span>
+                                    <span class="badge bg-danger"><i class="fas fa-ban me-1"></i>Blocked</span>
                                 {% else %}
-                                    <span class="badge bg-success">Active</span>
+                                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Active</span>
+                                {% endif %}
+                                
+                                {% if item.user.role == 'professional' %}
+                                    {% if item.is_verified %}
+                                        <i class="fas fa-certificate text-primary ms-1" title="Verified Professional"></i>
+                                    {% elif item.verification_failed %}
+                                        <i class="fas fa-times-circle text-danger ms-1" title="Verification Failed"></i>
+                                    {% else %}
+                                        <i class="fas fa-hourglass-half text-warning ms-1" title="Pending Verification"></i>
+                                    {% endif %}
                                 {% endif %}
                             </td>
-                            <td>
+
+                            <!-- 5. Actions Column -->
+                            <td class="text-end">
                                 {% if item.admin_blocked %}
                                 <form action="{{ url_for('admin.unblock_user', user_id=item.user.id) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-info">Unblock</button>
+                                    <input type="hidden" name="csrf_token" value="{{ form.csrf_token.current_token }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-info" title="Unblock User">
+                                        <i class="fas fa-unlock"></i> Unblock
+                                    </button>
                                 </form>
                                 {% else %}
                                 <form action="{{ url_for('admin.block_user', user_id=item.user.id) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-warning">Block</button>
+                                    <input type="hidden" name="csrf_token" value="{{ form.csrf_token.current_token }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to block this user?');" title="Block User">
+                                        <i class="fas fa-ban"></i> Block
+                                    </button>
                                 </form>
                                 {% endif %}
                             </td>
@@ -83,11 +142,15 @@
                 </table>
             </div>
             {% else %}
-            <p class="text-center text-muted">No results found for your query.</p>
+            <div class="p-5 text-center">
+                <div class="text-muted mb-2"><i class="fas fa-search fa-3x"></i></div>
+                <h5>No results found</h5>
+                <p class="text-muted">No {{ search_params.category }}s found matching "<strong>{{ search_params.q }}</strong>".</p>
+                <a href="{{ url_for('admin.admin_search') }}" class="btn btn-sm btn-secondary">Clear Filters</a>
+            </div>
             {% endif %}
         </div>
     </div>
     {% endif %}
-</div>
 </div>
 {% endblock %}

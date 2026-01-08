@@ -7,10 +7,11 @@
         <div class="d-flex justify-content-between align-items-center">
             <h2>{{ current_user.username}}'s Service History</h2>
         </div>
-    <div class="card">
-        <div class="card-body">
+    </div>
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
@@ -25,7 +26,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- LOOP 1: Build the table rows ONLY -->
                         {% for req in service_requests %}
                         <tr>
                             <td>#{{ req.id }}</td>
@@ -33,7 +33,13 @@
                             <td>{{ req.professional.user.username if req.professional else 'Pending Assignment' }}</td>
                             <td>{{ req.date_of_request.strftime('%Y-%m-%d') }}</td>
                             <td class="text-end">${{ '%.2f'|format(req.service.base_price) }}</td>
-                            <td class="text-end">${{ '%.2f'|format(req.proposed_price) }}</td>
+                            <td class="text-end">
+                                {% if req.proposed_price %}
+                                    ${{ '%.2f'|format(req.proposed_price) }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="badge 
                                     {% if req.service_status.name == 'REQUESTED' %} bg-warning text-dark
@@ -45,23 +51,22 @@
                                     {{ req.service_status.name.title() }}
                                 </span>
                             </td>
+                            <td>{{ req.date_of_completion.strftime('%Y-%m-%d') if req.date_of_completion else '-' }}</td>
                             <td class="text-center">
                                 {% if req.service_status.name == 'REQUESTED' %}
                                     <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#editRequestModal{{ req.id }}">Edit</button>
                                 {% elif req.service_status.name == 'ACCEPTED' %}
-                                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#reviewModal{{ req.id }}">Close & Review</button>
+                                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#reviewModal{{ req.id }}">Review</button>
                                 {% elif req.service_status.name == 'CLOSED' %}
                                     <a href="{{ url_for('customer.show_payment_form', request_id=req.id) }}" class="btn btn-sm btn-success">Pay Now</a>
                                 {% elif req.service_status.name == 'PAID' %}
-                                    <span class="text-muted fst-italic">Completed</span>
+                                    <span class="text-muted small"><i class="fas fa-check-circle text-success"></i> Paid</span>
                                 {% endif %}
                             </td>
-                            <td>{{ req.date_of_completion.strftime('%Y-%m-%d') if req.date_of_completion else 'N/A' }}</td>
-
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">You have no service requests yet.</td>
+                            <td colspan="9" class="text-center text-muted py-4">You have no service requests yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -70,54 +75,64 @@
         </div>
     </div>
 
-    <!-- ==================== THE FIX ==================== -->
-    <!-- LOOP 2: Define all modals OUTSIDE the table structure -->
+    <!-- MODALS -->
     {% for req in service_requests %}
-        <!-- Edit Request Modal (for 'REQUESTED' state) -->
+        <!-- Edit Request Modal -->
         {% if req.service_status.name == 'REQUESTED' %}
         <div class="modal fade" id="editRequestModal{{ req.id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
-                    <!-- Inside the form tag for the Edit Request Modal -->
-<form method="POST" action="{{ url_for('customer.update_service_request', request_id=req.id) }}">
-    {{ form.hidden_tag() }} <!-- Add CSRF token -->
-    <div class="modal-body">
-        <p>You are editing your request for <strong>{{ req.service.service_type }}</strong>.</p>
-        <div class="mb-3">
-            {{ form.proposed_price.label(class="form-label") }}
-            {{ form.proposed_price(class="form-control", value=req.proposed_price) }}
-        </div>
-    </div>
-    <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        {{ form.submit(class="btn btn-primary") }}
-    </div>
-</form>
+                    <form method="POST" action="{{ url_for('customer.update_service_request', request_id=req.id) }}">
+                        <!-- Use manual token because 'form' object is shared across loop -->
+                        <input type="hidden" name="csrf_token" value="{{ form.csrf_token.current_token }}">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Edit Request #{{ req.id }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Editing request for <strong>{{ req.service.service_type }}</strong>.</p>
+                            <div class="mb-3">
+                                {{ form.proposed_price.label(class="form-label") }}
+                                {{ form.proposed_price(class="form-control", value=req.proposed_price) }}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
         {% endif %}
 
-        <!-- Review Modal (for 'ACCEPTED' state) -->
+        <!-- Review Modal -->
         {% if req.service_status.name == 'ACCEPTED' %}
         <div class="modal fade" id="reviewModal{{ req.id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <form method="POST" action="{{ url_for('customer.review_service', request_id=req.id) }}">
+                        <!-- SECURITY FIX: Add CSRF Token -->
+                        <input type="hidden" name="csrf_token" value="{{ review_form.csrf_token.current_token }}">
+                        
                         <div class="modal-header">
                             <h5 class="modal-title">Review Service Request #{{ req.id }}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
-                                <label for="rating_{{ req.id }}" class="form-label">Rating (1-5)</label>
+                                <label for="rating_{{ req.id }}" class="form-label">Rating</label>
                                 <select name="rating" id="rating_{{ req.id }}" class="form-select" required>
-                                    <option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Average</option><option value="2">2 - Poor</option><option value="1">1 - Terrible</option>
+                                    <option value="5">5 - Excellent</option>
+                                    <option value="4">4 - Good</option>
+                                    <option value="3">3 - Average</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="1">1 - Terrible</option>
                                 </select>
                             </div>
                             <div class="mb-3">
                                 <label for="remarks_{{ req.id }}" class="form-label">Remarks</label>
-                                <textarea name="remarks" id="remarks_{{ req.id }}" rows="3" class="form-control"></textarea>
+                                <textarea name="remarks" id="remarks_{{ req.id }}" rows="3" class="form-control" placeholder="Describe your experience..."></textarea>
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -130,6 +145,5 @@
         </div>
         {% endif %}
     {% endfor %}
-    <!-- =============================================== -->
 </div>
 {% endblock %}
