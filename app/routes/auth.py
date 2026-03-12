@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, get_flashed_messages
 from flask_login import login_user, logout_user, login_required
-from app import db
+from app import db, limiter
 from app.models import Users, Customers, ServiceProfessionals
 from app.forms import LoginForm, RegistrationForm
 
@@ -13,6 +13,7 @@ def index():
     return redirect(url_for('auth.login'))
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute; 50 per hour")
 def login():
     form = LoginForm()
     if form.validate_on_submit():
@@ -69,6 +70,7 @@ def logout():
     return redirect(url_for("auth.login"))
 
 @auth_bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute; 20 per hour")
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():

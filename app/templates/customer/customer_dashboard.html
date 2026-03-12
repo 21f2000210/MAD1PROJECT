@@ -123,17 +123,24 @@
                     </div>
                     <div class="modal-body">
                         <p>You are booking <strong>{{ item.service.service_type }}</strong> service.</p>
-                        
+
                         <div class="mb-3">
                             {{ form.proposed_price.label(class="form-label") }}
-                            <!-- Use the base price from the item object -->
-                            {{ form.proposed_price(class="form-control", value=item.service.base_price) }}
+                            {{ form.proposed_price(class="form-control",
+                                value=item.service.base_price,
+                                id="price-input-" ~ item.prof.id) }}
+                            <!-- AI Price Estimator hint -->
+                            <div class="ai-price-hint mt-1"
+                                 onclick="estimatePrice('{{ item.service.service_type }}', {{ item.service.base_price }}, '{{ item.prof.description|replace("'", "\\'") }}', {{ item.prof.id }})">
+                                <i class="fas fa-robot"></i>
+                                <span>Get AI price suggestion</span>
+                            </div>
+                            <div id="ai-price-result-{{ item.prof.id }}" class="d-none ai-price-result"></div>
                         </div>
-                        
+
                         <!-- Manual Service ID Hidden Input -->
                         <input type="hidden" name="service_id" value="{{ item.prof.service_id }}">
-                        
-                        <!-- FIXED: Use standard HTML input for date instead of form.date_of_request -->
+
                         <div class="mb-3">
                             <label class="form-label">Date of Service</label>
                             <input type="date" name="date_of_request" class="form-control" required>
@@ -150,4 +157,41 @@
     {% endfor %}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function estimatePrice(serviceType, basePrice, description, profId) {
+    const resultDiv = document.getElementById('ai-price-result-' + profId);
+    const priceInput = document.getElementById('price-input-' + profId);
+
+    resultDiv.classList.remove('d-none');
+    resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Getting AI price suggestion…';
+
+    try {
+        const resp = await fetch('/ai/estimate-price', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ service_type: serviceType, base_price: basePrice, description: description })
+        });
+        const data = await resp.json();
+        if (data.min_price && data.max_price) {
+            resultDiv.innerHTML = `
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="fas fa-robot text-primary"></i>
+                    <strong>AI Suggested Range: ₹${data.min_price} – ₹${data.max_price}</strong>
+                    <button type="button" class="btn btn-xs btn-outline-primary btn-sm py-0 px-2"
+                            onclick="document.getElementById('price-input-${profId}').value=${Math.round((data.min_price+data.max_price)/2)}">
+                        Use midpoint
+                    </button>
+                </div>
+                <small class="text-muted">${data.reasoning || ''}</small>`;
+        } else {
+            resultDiv.innerHTML = '<small class="text-danger">' + (data.error || 'Could not estimate price.') + '</small>';
+        }
+    } catch(e) {
+        resultDiv.innerHTML = '<small class="text-danger">Network error. Please enter price manually.</small>';
+    }
+}
+</script>
 {% endblock %}

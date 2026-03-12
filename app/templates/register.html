@@ -10,44 +10,63 @@
                 <h2 class="card-title">Create an Account</h2>
                 <p class="text-muted">Join the Household Services platform</p>
             </div>
-            
-            <!-- The WTForms form will go here -->
-            <form method="POST" action="{{ url_for('auth.register') }}">
+
+            <form method="POST" action="{{ url_for('auth.register') }}" id="register-form">
                 {{ form.hidden_tag() }}
-                
+
                 <div class="mb-3">
                     {{ form.username.label(class="form-label") }}
                     {{ form.username(class="form-control") }}
-                    {% for error in form.username.errors %} <span class="text-danger small">{{ error }}</span> {% endfor %}
+                    {% for error in form.username.errors %}
+                        <span class="text-danger small">{{ error }}</span>
+                    {% endfor %}
                 </div>
+
                 <div class="mb-3">
                     {{ form.email.label(class="form-label") }}
                     {{ form.email(class="form-control") }}
-                    {% for error in form.email.errors %} <span class="text-danger small">{{ error }}</span> {% endfor %}
+                    {% for error in form.email.errors %}
+                        <span class="text-danger small">{{ error }}</span>
+                    {% endfor %}
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         {{ form.password.label(class="form-label") }}
-                        {{ form.password(class="form-control") }}
-                        {% for error in form.password.errors %} <span class="text-danger small">{{ error }}</span> {% endfor %}
+                        {{ form.password(class="form-control", id="password-field") }}
+                        <!-- Password Strength Meter -->
+                        <div class="password-strength-bar" id="strength-bar"></div>
+                        <div class="password-strength-label text-muted" id="strength-label"></div>
+                        {% for error in form.password.errors %}
+                            <span class="text-danger small">{{ error }}</span>
+                        {% endfor %}
                     </div>
                     <div class="col-md-6 mb-3">
                         {{ form.confirm_password.label(class="form-label") }}
-                        {{ form.confirm_password(class="form-control") }}
-                        {% for error in form.confirm_password.errors %} <span class="text-danger small">{{ error }}</span> {% endfor %}
+                        {{ form.confirm_password(class="form-control", id="confirm-password-field") }}
+                        <div class="small mt-1" id="password-match-indicator"></div>
+                        {% for error in form.confirm_password.errors %}
+                            <span class="text-danger small">{{ error }}</span>
+                        {% endfor %}
                     </div>
                 </div>
+
                 <div class="mb-3">
                     {{ form.address.label(class="form-label") }}
                     {{ form.address(class="form-control") }}
-                    {% for error in form.address.errors %} <span class="text-danger small">{{ error }}</span> {% endfor %}
+                    {% for error in form.address.errors %}
+                        <span class="text-danger small">{{ error }}</span>
+                    {% endfor %}
                 </div>
+
                 <div class="mb-3">
                     {{ form.pin.label(class="form-label") }}
                     {{ form.pin(class="form-control") }}
-                    {% for error in form.pin.errors %} <span class="text-danger small">{{ error }}</span> {% endfor %}
+                    {% for error in form.pin.errors %}
+                        <span class="text-danger small">{{ error }}</span>
+                    {% endfor %}
                 </div>
+
                 <div class="mb-3">
                     {{ form.role.label(class="form-label") }}
                     {{ form.role(class="form-select", onchange="toggleProfessionalFields()") }}
@@ -58,53 +77,168 @@
                     <hr>
                     <div class="mb-3">
                         {{ form.service_id.label(class="form-label") }}
-                        {{ form.service_id(class="form-select") }}
+                        {{ form.service_id(class="form-select", id="service-id-field") }}
                     </div>
+
                     <div class="mb-3">
-                    {{ form.description.label(class="form-label") }}
-                    {{ form.description(class="form-control", rows=3) }}
-                </div>
-                <div class="mb-3">
-                    {{ form.experience.label(class="form-label") }}
-                    {{ form.experience(class="form-control", placeholder="e.g., 5") }}
-                </div>
-                <div class="mb-3">
-                    {{ form.document.label(class="form-label") }}
-                    {{ form.document(class="form-control", placeholder="e.g., https://linkedin.com/profile") }}
-                </div>
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control", rows=3, id="description-field") }}
+                        <!-- AI Description Generator Button -->
+                        <div class="mt-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="ai-desc-btn"
+                                    onclick="generateAIDescription()">
+                                <i class="fas fa-robot me-1"></i> AI: Generate Description
+                            </button>
+                            <span class="text-muted small ms-2" id="ai-desc-status"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.experience.label(class="form-label") }}
+                        {{ form.experience(class="form-control", placeholder="e.g., 5", id="experience-field") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.document.label(class="form-label") }}
+                        {{ form.document(class="form-control", placeholder="e.g., https://linkedin.com/profile") }}
+                    </div>
                 </div>
 
                 <div class="d-grid">
                     {{ form.submit(class="btn btn-primary btn-lg") }}
                 </div>
             </form>
+
             <p class="text-center mt-4">
                 Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a>
             </p>
         </div>
     </div>
-    <div class="auth-image-container">
-    <!-- This div is intentionally empty; the background is handled by CSS -->
-</div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // This function shows or hides the professional-specific form fields
-    function toggleProfessionalFields() {
-        var role = document.getElementById('role').value;
-        var professionalFields = document.getElementById('professional-fields');
-        if (role === 'professional') {
-            professionalFields.style.display = 'block';
+// -----------------------------------------------------------------------
+// Toggle professional fields based on role selection
+// -----------------------------------------------------------------------
+function toggleProfessionalFields() {
+    var role = document.getElementById('role').value;
+    var professionalFields = document.getElementById('professional-fields');
+    professionalFields.style.display = (role === 'professional') ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    toggleProfessionalFields();
+    initPasswordStrength();
+    initPasswordMatch();
+});
+
+// -----------------------------------------------------------------------
+// Password Strength Meter
+// -----------------------------------------------------------------------
+function initPasswordStrength() {
+    const input = document.getElementById('password-field');
+    const bar   = document.getElementById('strength-bar');
+    const label = document.getElementById('strength-label');
+    if (!input) return;
+
+    input.addEventListener('input', function () {
+        const val = this.value;
+        let score = 0;
+        if (val.length >= 8)                   score++;
+        if (/[A-Z]/.test(val))                 score++;
+        if (/[0-9]/.test(val))                 score++;
+        if (/[^A-Za-z0-9]/.test(val))          score++;
+
+        bar.className = 'password-strength-bar';
+        if (val.length === 0) {
+            bar.style.width = '0';
+            label.textContent = '';
+        } else if (score <= 1) {
+            bar.classList.add('strength-weak');
+            label.textContent = 'Weak – add numbers, uppercase & symbols';
+            label.className = 'password-strength-label text-danger';
+        } else if (score === 2 || score === 3) {
+            bar.classList.add('strength-medium');
+            label.textContent = 'Medium – getting better!';
+            label.className = 'password-strength-label text-warning';
         } else {
-            professionalFields.style.display = 'none';
+            bar.classList.add('strength-strong');
+            label.textContent = 'Strong password!';
+            label.className = 'password-strength-label text-success';
+        }
+    });
+}
+
+// -----------------------------------------------------------------------
+// Password Match Indicator
+// -----------------------------------------------------------------------
+function initPasswordMatch() {
+    const pass    = document.getElementById('password-field');
+    const confirm = document.getElementById('confirm-password-field');
+    const indicator = document.getElementById('password-match-indicator');
+    if (!confirm) return;
+
+    function check() {
+        if (!confirm.value) { indicator.textContent = ''; return; }
+        if (pass.value === confirm.value) {
+            indicator.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Passwords match</span>';
+        } else {
+            indicator.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Passwords do not match</span>';
         }
     }
 
-    // Run the function on page load in case the browser remembers the last selection
-    document.addEventListener('DOMContentLoaded', function() {
-        toggleProfessionalFields();
-    });
+    confirm.addEventListener('input', check);
+    pass.addEventListener('input', check);
+}
+
+// -----------------------------------------------------------------------
+// AI Description Generator
+// -----------------------------------------------------------------------
+async function generateAIDescription() {
+    const btn        = document.getElementById('ai-desc-btn');
+    const status     = document.getElementById('ai-desc-status');
+    const descField  = document.getElementById('description-field');
+    const serviceEl  = document.getElementById('service-id-field');
+    const expEl      = document.getElementById('experience-field');
+
+    const serviceText = serviceEl ? serviceEl.options[serviceEl.selectedIndex]?.text || '' : '';
+    const experience  = expEl ? expEl.value || 1 : 1;
+
+    if (!serviceText || serviceText === '-- Select a Service --') {
+        status.textContent = 'Please select a service first.';
+        status.className = 'text-danger small ms-2';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.classList.add('btn-loading');
+    status.textContent = 'Generating…';
+    status.className = 'text-muted small ms-2';
+
+    try {
+        const resp = await fetch('/ai/generate-description', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ service_type: serviceText, experience: parseInt(experience) })
+        });
+        const data = await resp.json();
+        if (data.description) {
+            descField.value = data.description;
+            status.textContent = 'Done! Edit as needed.';
+            status.className = 'text-success small ms-2';
+        } else {
+            status.textContent = data.error || 'Could not generate. Try again.';
+            status.className = 'text-danger small ms-2';
+        }
+    } catch (err) {
+        status.textContent = 'Network error. Please try again.';
+        status.className = 'text-danger small ms-2';
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
+    }
+}
 </script>
 {% endblock %}
