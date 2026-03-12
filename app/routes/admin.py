@@ -1,5 +1,7 @@
+import csv
+import io
 from functools import wraps
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, jsonify, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, jsonify, current_app, Response
 from flask_login import login_required, current_user
 from app import db
 from sqlalchemy import or_, func
@@ -7,6 +9,7 @@ from sqlalchemy.orm import joinedload
 from app.models import Users, Customers, ServiceProfessionals, Services, ServiceRequests, Reviews, ServiceStatus
 from app.forms import CreateServiceForm, UpdateServiceForm
 from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -373,3 +376,77 @@ def reassign_professional(request_id):
         flash("Database error during reassignment.", "danger")
 
     return redirect(url_for('admin.admin_dashboard'))
+
+
+# ============================================================
+# CSV EXPORT ROUTES
+# ============================================================
+
+@admin_bp.route('/export/requests')
+@admin_required
+def export_requests_csv():
+    """Export all service requests as a CSV file."""
+    requests_data = ServiceRequests.query\
+        .options(
+            joinedload(ServiceRequests.service),
+            joinedload(ServiceRequests.customer).joinedload(Customers.user),
+            joinedload(ServiceRequests.professional).joinedload(ServiceProfessionals.user),
+        ).order_by(ServiceRequests.date_of_request.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'Request ID', 'Service', 'Customer', 'Customer Email',
+        'Professional', 'Professional Email', 'Proposed Price (INR)',
+        'Status', 'Date of Request', 'Date of Completion'
+    ])
+    for r in requests_data:
+        writer.writerow([
+            r.id,
+            r.service.service_type if r.service else '',
+            r.customer.user.username if r.customer and r.customer.user else '',
+            r.customer.user.email if r.customer and r.customer.user else '',
+            r.professional.user.username if r.professional and r.professional.user else '',
+            r.professional.user.email if r.professional and r.professional.user else '',
+            r.proposed_price,
+            r.service_status.value,
+            r.date_of_request.strftime('%Y-%m-%d') if r.date_of_request else '',
+            r.date_of_completion.strftime('%Y-%m-%d %H:%M') if r.date_of_completion else '',
+        ])
+
+    output.seek(0)
+    filename = f"service_requests_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+
+@admin_bp.route('/export/users')
+@admin_required
+def export_users_csv():
+    """Export all users as a CSV file."""
+    users = Users.query.order_by(Users.created_at.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'User ID', 'Username', 'Email', 'Role', 'Address', 'PIN',
+        'Active', 'Created At'
+    ])
+    for u in users:
+        writer.writerow([
+            u.id, u.username, u.email, u.role,
+            u.address or '', u.pin or '',
+            'Yes' if u.is_active else 'No',
+            u.created_at.strftime('%Y-%m-%d') if u.created_at else '',
+        ])
+
+    output.seek(0)
+    filename = f"users_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )

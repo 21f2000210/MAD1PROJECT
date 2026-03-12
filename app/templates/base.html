@@ -1,35 +1,284 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Household Services{% endblock %}</title>
     <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome for Icons -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Your Custom CSS -->
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 {% set is_auth_page = request.endpoint in ['auth.login', 'auth.register'] %}
 <body class="{{ 'auth-wrapper' if is_auth_page else '' }}">
-    
+
     {% if not is_auth_page %}{% include '_navbar.html' %}{% endif %}
 
+    <!-- Toast Container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
     <main class="container my-4">
-        {% if not is_auth_page %}{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}{% for category, message in messages %}
+        {% if not is_auth_page %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            <span>{{ message }}</span><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <span>{{ message }}</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-        {% endfor %}{% endif %}{% endwith %}{% endif %}
-        
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+        {% endif %}
+
         {% block content %}{% endblock %}
     </main>
 
+    <!-- =====================================================================
+         AI CHAT ASSISTANT WIDGET
+         Only shown to authenticated users (not on auth pages)
+    ====================================================================== -->
+    {% if current_user.is_authenticated and not is_auth_page %}
+    <div id="chat-widget">
+        <!-- Toggle Button -->
+        <button id="chat-toggle-btn" title="AI Assistant" aria-label="Open AI Chat">
+            <i class="fas fa-robot" id="chat-open-icon"></i>
+            <i class="fas fa-times d-none" id="chat-close-icon"></i>
+            <span class="chat-badge d-none" id="chat-unread-badge">1</span>
+        </button>
+
+        <!-- Chat Panel -->
+        <div id="chat-panel" class="d-none">
+            <div id="chat-header">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-robot text-primary"></i>
+                    <div>
+                        <div class="fw-bold">AI Assistant</div>
+                        <div class="chat-status-text"><span class="chat-status-dot"></span> Online</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-link text-muted" id="chat-clear-btn" title="Clear chat">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+
+            <div id="chat-messages">
+                <div class="chat-message assistant">
+                    <div class="chat-bubble">
+                        Hi! I'm your AI assistant. How can I help you today? Ask me about services, pricing, or how to book! 👋
+                    </div>
+                    <div class="chat-time">Just now</div>
+                </div>
+            </div>
+
+            <div id="chat-input-area">
+                <div class="chat-typing-indicator d-none" id="chat-typing">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="d-flex gap-2">
+                    <input type="text" id="chat-input" class="form-control form-control-sm"
+                           placeholder="Type your message..." maxlength="500" autocomplete="off">
+                    <button id="chat-send-btn" class="btn btn-primary btn-sm" title="Send">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- =====================================================================
+         GLOBAL SCRIPTS: Dark Mode + Toast + Chat
+    ====================================================================== -->
+    <script>
+    // -----------------------------------------------------------------------
+    // DARK MODE
+    // -----------------------------------------------------------------------
+    (function () {
+        const saved = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+    })();
+
+    function toggleDarkMode() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        // Update icon
+        const icon = document.getElementById('dark-mode-icon');
+        if (icon) {
+            icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // TOAST NOTIFICATIONS
+    // -----------------------------------------------------------------------
+    function showToast(message, type = 'success', duration = 4000) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const id = 'toast-' + Date.now();
+        const icons = { success: 'check-circle', danger: 'exclamation-circle', warning: 'exclamation-triangle', info: 'info-circle' };
+        const icon = icons[type] || 'info-circle';
+        const toast = document.createElement('div');
+        toast.id = id;
+        toast.className = `custom-toast custom-toast-${type}`;
+        toast.innerHTML = `
+            <i class="fas fa-${icon} me-2"></i>
+            <span class="flex-grow-1">${message}</span>
+            <button onclick="this.parentElement.remove()" class="toast-close-btn" aria-label="Close">&times;</button>`;
+        container.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, duration);
+    }
+
+    // Auto-convert flash alerts to toasts on load
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.alert[role="alert"]').forEach(function (alert) {
+            const type = Array.from(alert.classList).find(c => c.startsWith('alert-') && c !== 'alert-dismissible') || 'alert-info';
+            const msgType = type.replace('alert-', '');
+            const text = alert.querySelector('span')?.textContent?.trim();
+            if (text) showToast(text, msgType);
+            alert.style.display = 'none';
+        });
+
+        // Update dark mode icon on load
+        const icon = document.getElementById('dark-mode-icon');
+        if (icon) {
+            const theme = localStorage.getItem('theme') || 'light';
+            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // AI CHAT WIDGET
+    // -----------------------------------------------------------------------
+    (function () {
+        const panel     = document.getElementById('chat-panel');
+        const toggleBtn = document.getElementById('chat-toggle-btn');
+        const openIcon  = document.getElementById('chat-open-icon');
+        const closeIcon = document.getElementById('chat-close-icon');
+        const badge     = document.getElementById('chat-unread-badge');
+        const input     = document.getElementById('chat-input');
+        const sendBtn   = document.getElementById('chat-send-btn');
+        const messagesEl= document.getElementById('chat-messages');
+        const typingEl  = document.getElementById('chat-typing');
+        const clearBtn  = document.getElementById('chat-clear-btn');
+
+        if (!panel) return; // Not authenticated or auth page
+
+        let conversationHistory = [];
+        let isOpen = false;
+
+        function openChat() {
+            panel.classList.remove('d-none');
+            openIcon.classList.add('d-none');
+            closeIcon.classList.remove('d-none');
+            badge.classList.add('d-none');
+            isOpen = true;
+            input.focus();
+        }
+
+        function closeChat() {
+            panel.classList.add('d-none');
+            openIcon.classList.remove('d-none');
+            closeIcon.classList.add('d-none');
+            isOpen = false;
+        }
+
+        toggleBtn.addEventListener('click', () => isOpen ? closeChat() : openChat());
+
+        clearBtn && clearBtn.addEventListener('click', () => {
+            conversationHistory = [];
+            messagesEl.innerHTML = `
+                <div class="chat-message assistant">
+                    <div class="chat-bubble">Chat cleared! How can I help you?</div>
+                    <div class="chat-time">Just now</div>
+                </div>`;
+        });
+
+        function formatTime() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function appendMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `chat-message ${role}`;
+            div.innerHTML = `
+                <div class="chat-bubble">${text.replace(/\n/g, '<br>')}</div>
+                <div class="chat-time">${formatTime()}</div>`;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            sendBtn.disabled = true;
+            appendMessage('user', text);
+            conversationHistory.push({ role: 'user', content: text });
+
+            // Show typing indicator
+            typingEl.classList.remove('d-none');
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            try {
+                const resp = await fetch('/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify({ message: text, history: conversationHistory.slice(-10) })
+                });
+                const data = await resp.json();
+                typingEl.classList.add('d-none');
+
+                const reply = data.reply || data.error || 'Sorry, something went wrong.';
+                conversationHistory.push({ role: 'assistant', content: reply });
+                appendMessage('assistant', reply);
+            } catch (err) {
+                typingEl.classList.add('d-none');
+                appendMessage('assistant', 'Connection error. Please try again.');
+            } finally {
+                sendBtn.disabled = false;
+                input.focus();
+            }
+        }
+
+        function getCsrfToken() {
+            // Try to get CSRF token from meta tag or cookie
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.content;
+            const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+            return cookie ? cookie.split('=')[1] : '';
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+
+        // Show unread badge after 3s if chat is closed
+        setTimeout(() => {
+            if (!isOpen && badge) badge.classList.remove('d-none');
+        }, 3000);
+    })();
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

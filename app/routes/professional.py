@@ -1,10 +1,11 @@
 from functools import wraps
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, current_app
 from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
 from app import db
 from app.models import ServiceRequests, Reviews, ServiceStatus
 from app.forms import HandleRequestForm
+from app.services.email_service import notify_request_accepted, notify_request_rejected
 
 professional_bp = Blueprint('professional', __name__)
 
@@ -76,13 +77,35 @@ def handle_request(request_id):
     if form.validate_on_submit():
         if form.action.data == 'accept':
             service_request.service_status = ServiceStatus.ACCEPTED
+            db.session.commit()
             flash(f'Request #{service_request.id} has been accepted.', 'success')
+            try:
+                notify_request_accepted(
+                    customer_email=service_request.customer.user.email,
+                    customer_name=service_request.customer.user.username,
+                    professional_name=current_user.username,
+                    service_type=service_request.service.service_type,
+                    request_id=service_request.id,
+                )
+            except Exception as email_err:
+                current_app.logger.warning(f"Accept email failed: {email_err}")
         elif form.action.data == 'reject':
             service_request.service_status = ServiceStatus.REJECTED
+            db.session.commit()
             flash(f'Request #{service_request.id} has been rejected.', 'warning')
+            try:
+                notify_request_rejected(
+                    customer_email=service_request.customer.user.email,
+                    customer_name=service_request.customer.user.username,
+                    professional_name=current_user.username,
+                    service_type=service_request.service.service_type,
+                    request_id=service_request.id,
+                )
+            except Exception as email_err:
+                current_app.logger.warning(f"Reject email failed: {email_err}")
         else:
+            db.session.commit()
             flash('Invalid action.', 'danger')
-        db.session.commit()
     else:
         flash('An error occurred. Please try again.', 'danger')
 

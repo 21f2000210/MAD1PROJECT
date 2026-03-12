@@ -8,6 +8,11 @@ from app.models import Users, Customers, Services, ServiceProfessionals, Service
 from app.forms import ReviewForm, BookingForm, UpdateRequestForm
 from sqlalchemy.orm import joinedload
 from datetime import datetime
+from app.services.email_service import (
+    notify_booking_created,
+    notify_professional_new_request,
+    notify_payment_complete,
+)
 
 customer_bp = Blueprint('customer', __name__)
 
@@ -223,6 +228,26 @@ def book_service(professional_id):
             db.session.add(new_request)
             db.session.commit()
             flash('Your service request has been sent!', 'success')
+            # Email notifications (non-blocking)
+            try:
+                notify_booking_created(
+                    customer_email=current_user.email,
+                    customer_name=current_user.username,
+                    professional_name=professional.user.username,
+                    service_type=professional.service.service_type,
+                    request_id=new_request.id,
+                    proposed_price=form.proposed_price.data,
+                )
+                notify_professional_new_request(
+                    professional_email=professional.user.email,
+                    professional_name=professional.user.username,
+                    customer_name=current_user.username,
+                    service_type=professional.service.service_type,
+                    request_id=new_request.id,
+                    proposed_price=form.proposed_price.data,
+                )
+            except Exception as email_err:
+                current_app.logger.warning(f"Email notification failed: {email_err}")
             return redirect(url_for('customer.service_history'))
         except SQLAlchemyError as e:
             db.session.rollback()
@@ -353,9 +378,20 @@ def process_payment(request_id):
 
     try:
         service_request.service_status = ServiceStatus.PAID
-        service_request.date_of_completion = datetime.utcnow() # Record exact payment time if desired
+        service_request.date_of_completion = datetime.utcnow()
         db.session.commit()
         flash(f"Payment for request #{service_request.id} was successful! Thank you.", "success")
+        # Email notification
+        try:
+            notify_payment_complete(
+                customer_email=current_user.email,
+                customer_name=current_user.username,
+                service_type=service_request.service.service_type,
+                request_id=service_request.id,
+                amount=service_request.proposed_price,
+            )
+        except Exception as email_err:
+            current_app.logger.warning(f"Payment email failed: {email_err}")
     except SQLAlchemyError:
         db.session.rollback()
         flash("Transaction failed. Please try again.", "danger")
