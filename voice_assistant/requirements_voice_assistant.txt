@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════════════════════════════
+#  ADAS Voice AI  —  requirements  (LOCAL / OFFLINE edition)
+#  Install:  pip install -r requirements_voice_assistant.txt
+#
+#  For PyTorch CPU-only (saves ~1 GB vs default install):
+#    pip install torch --index-url https://download.pytorch.org/whl/cpu
+#    pip install -r requirements_voice_assistant.txt
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Audio I/O ───────────────────────────────────────────────────────
+sounddevice>=0.4.6          # microphone input + audio playback
+numpy>=1.24.0               # audio buffer maths
+
+# ── Speech-to-Text (STT) ────────────────────────────────────────────
+faster-whisper>=1.0.0       # CTranslate2 Whisper; runs on CPU int8
+# ctranslate2 is pulled in by faster-whisper automatically
+
+# ── Translation  ────────────────────────────────────────────────────
+# Replaces: deep-translator, MyMemory API, LibreTranslate (all internet)
+# facebook/nllb-200-distilled-600M  downloaded on first run (~1.2 GB)
+transformers>=4.38.0        # NLLB-200 + MMS-TTS models
+torch>=2.1.0                # CPU inference for translation & TTS
+sentencepiece>=0.1.99       # NLLB tokeniser
+sacremoses>=0.1.1           # NLLB detokeniser
+
+# ── Text-to-Speech (TTS) ────────────────────────────────────────────
+# Replaces: edge-tts (MS Azure), gTTS (Google), Gemini TTS (all internet)
+# facebook/mms-tts-ben  downloaded on first run (~400 MB)
+# (transformers + torch already listed above)
+
+# ── LLM back-end ────────────────────────────────────────────────────
+requests>=2.31.0            # HTTP calls to local Ollama server
+# Ollama itself: https://ollama.com/download  (separate install)
+
+# ── Vector Database ─────────────────────────────────────────────────
+faiss-cpu>=1.7.4            # FAISS flat index, CPU-only build
+sentence-transformers>=2.6.0  # all-MiniLM-L6-v2 embeddings
+
+# ── GUI ─────────────────────────────────────────────────────────────
+# tkinter  ← built into CPython; no pip install required
+
+# ── Optional TTS fallbacks ──────────────────────────────────────────
+# espeak-ng  (system package, fast, basic Bengali quality)
+#   Linux:   sudo apt install espeak-ng
+#   Windows: https://github.com/espeak-ng/espeak-ng/releases
+#
+# pyttsx3  (last resort, no real Bengali voice)
+#   pip install pyttsx3
+
+# ── REMOVED (internet-dependent, no longer used) ────────────────────
+# deep-translator      # was: Google Translate API
+# gtts                 # was: Google TTS (internet)
+# edge-tts             # was: Microsoft Azure Neural TTS (internet)
+# aiohttp              # was: only needed for edge-tts
+# pygame               # was: only needed for edge-tts/gTTS playback
